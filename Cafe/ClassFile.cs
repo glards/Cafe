@@ -79,7 +79,7 @@ namespace Cafe
                     return new FieldType(NativeTypes.Long);
                 case 'L':
                     int separatorPos = descriptor.IndexOf(";", startIndex);
-                    string className = descriptor.Substring(startIndex + 1, separatorPos - 1);
+                    string className = descriptor.Substring(startIndex + 1, separatorPos - startIndex - 1);
                     stopIndex = separatorPos + 1;
                     return new ObjectType(className);
                 case 'S':
@@ -87,16 +87,55 @@ namespace Cafe
                 case 'Z':
                     return new FieldType(NativeTypes.Boolean);
                 case '[':
-                    return new ArrayType(ParseFieldType(descriptor.Substring(1)));
+                    return new ArrayType(ParseFieldType(descriptor, startIndex + 1, out stopIndex));
                 default:
                     throw new ArgumentOutOfRangeException();
             }
         }
+        
         public static FieldType ParseFieldType(string descriptor)
         {
             int startIndex = 0;
             int stopIndex;
             return ParseFieldType(descriptor, startIndex, out stopIndex);
+        }
+
+        public static MethodDescriptor ParseMethodDescriptor(string descriptor)
+        {
+            FieldType ret = new FieldType(NativeTypes.Void);
+            List<FieldType> parameters = new List<FieldType>();
+            
+            if (descriptor[0] != '(')
+            {
+                throw new ArgumentException("Descriptor does not start with '('");
+            }
+
+            int index = 1;
+            int endIndex = -1;
+            while (index < descriptor.Length && descriptor[index] != ')')
+            {
+                var parameter = ParseFieldType(descriptor, index, out endIndex);
+                parameters.Add(parameter);
+                index = endIndex;
+            }
+
+            if (index >= descriptor.Length)
+            {
+                throw new ArgumentException("Descriptor is not complete and does not contain ')'");
+            }
+
+            index++;
+            if (index >= descriptor.Length)
+            {
+                throw new ArgumentException("Descriptor is not complete and does not contain a return value");
+            }
+
+            if (descriptor[index] != 'V')
+            {
+                ret = ParseFieldType(descriptor, index, out endIndex);
+            }
+
+            return new MethodDescriptor(parameters.ToArray(), ret);
         }
     }
 
@@ -111,7 +150,8 @@ namespace Cafe
         ClassReference,
         Short,
         Boolean,
-        Array
+        Array,
+        Void
     }
 
     public class FieldType
@@ -141,6 +181,19 @@ namespace Cafe
         public ArrayType(FieldType innerType) : base(NativeTypes.Array)
         {
             InnerType = innerType;
+        }
+    }
+
+    public class MethodDescriptor
+    {
+        public FieldType ReturnType { get; set; }
+
+        public FieldType[] ParameterTypes { get; set; }
+        
+        public MethodDescriptor(FieldType[] parameterTypes, FieldType returnType)
+        {
+            ParameterTypes = parameterTypes;
+            ReturnType = returnType;
         }
     }
 }
