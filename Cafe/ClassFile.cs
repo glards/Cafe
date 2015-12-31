@@ -60,8 +60,17 @@ namespace Cafe
 
                 for (int i = 0; i < constantCount; i++)
                 {
-                    ConstantTag tag = (ConstantTag)br.ReadByte();
-                    var constant = ReadConstant(br, cls, tag);
+                    ConstantBase constant;
+                    try
+                    {
+                        ConstantTag tag = (ConstantTag) br.ReadByte();
+                        constant = ReadConstant(br, cls, tag);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        // javap ignore invalid constants
+                        constant = new ConstantInvalidInfo();
+                    }
                     cls.ConstantPool.Constants.Add(constant);
                 }
 
@@ -109,18 +118,21 @@ namespace Cafe
         private ConstantInvokeDynamicInfo ReadConstantInvokeDynamic(JavaBinaryReader br, ClassFile cls)
         {
             int attributeIndex = br.ReadUInt16();
-            return new ConstantInvokeDynamicInfo(cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+            int index = br.ReadUInt16();
+            return new ConstantInvokeDynamicInfo(cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(index));
         }
 
         private ConstantMethodTypeInfo ReadConstantMethodType(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantMethodTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+            int index = br.ReadUInt16();
+            return new ConstantMethodTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(index));
         }
 
         private ConstantMethodHandleInfo ReadConstantMethodHandle(JavaBinaryReader br, ClassFile cls)
         {
             ReferenceKind kind = (ReferenceKind)br.ReadByte();
-            return new ConstantMethodHandleInfo(kind, cls.ConstantPool.GetConstant<ConstantBase>(br.ReadUInt16()));
+            int index = br.ReadUInt16();
+            return new ConstantMethodHandleInfo(kind, cls.ConstantPool.GetConstant<ConstantBase>(index));
         }
 
         private ConstantUtf8Info ReadConstantUtf8(JavaBinaryReader br, ClassFile cls)
@@ -139,47 +151,59 @@ namespace Cafe
 
         private ConstantDoubleInfo ReadConstantDouble(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantDoubleInfo(BitConverter.ToDouble(br.ReadBytes(8), 0));
+            double val = BitConverter.ToDouble(br.ReadBytes(8), 0);
+            return new ConstantDoubleInfo(val);
         }
 
         private ConstantLongInfo ReadConstantLong(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantLongInfo(br.ReadInt64());
+            long val = br.ReadInt64();
+            return new ConstantLongInfo(val);
         }
 
         private ConstantFloatInfo ReadConstantFloat(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantFloatInfo(BitConverter.ToSingle(br.ReadBytes(4), 0));
+            float val = BitConverter.ToSingle(br.ReadBytes(4), 0);
+            return new ConstantFloatInfo(val);
         }
 
         private ConstantIntegerInfo ReadConstantInteger(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantIntegerInfo(br.ReadInt32());
+            int val = br.ReadInt32();
+            return new ConstantIntegerInfo(val);
         }
 
         private ConstantStringInfo ReadConstantString(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantStringInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+            int stringIndex = br.ReadUInt16();
+            return new ConstantStringInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(stringIndex));
         }
 
         private ConstantInterfaceMethodRefInfo ReadConstantInterfaceMethodRef(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantInterfaceMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+            int classIndex = br.ReadUInt16();
+            int nameAndTypeIndex = br.ReadUInt16();
+            return new ConstantInterfaceMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(classIndex), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(nameAndTypeIndex));
         }
 
         private ConstantMethodRefInfo ReadConstantMethodRef(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+            int classIndex = br.ReadUInt16();
+            int nameAndTypeIndex = br.ReadUInt16();
+            return new ConstantMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(classIndex), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(nameAndTypeIndex));
         }
 
         private ConstantFieldRefInfo ReadConstantFieldRef(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantFieldRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+            int classIndex = br.ReadUInt16();
+            int nameAndTypeIndex = br.ReadUInt16();
+            return new ConstantFieldRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(classIndex), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(nameAndTypeIndex));
         }
 
         private ConstantClassInfo ReadConstantClass(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantClassInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+            int classIndex = br.ReadUInt16();
+            return new ConstantClassInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(classIndex));
         }
     }
 
@@ -344,7 +368,7 @@ namespace Cafe
         }
     }
 
-    public enum ConstantTag
+    public enum ConstantTag : byte
     {
         Class = 7,
         FieldRef = 9,
@@ -359,7 +383,9 @@ namespace Cafe
         Utf8 = 1,
         MethodHandle = 15,
         MethodType = 16,
-        InvokeDynamic = 18
+        InvokeDynamic = 18,
+
+        Invalid = Byte.MaxValue,
     }
 
     public class ConstantPool
@@ -389,6 +415,13 @@ namespace Cafe
         public ConstantBase(ConstantTag tag)
         {
             Tag = tag;
+        }
+    }
+
+    public class ConstantInvalidInfo : ConstantBase
+    {
+        public ConstantInvalidInfo() : base(ConstantTag.Invalid)
+        {
         }
     }
 
