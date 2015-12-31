@@ -18,13 +18,7 @@ namespace Cafe.Tests
                 ClassReader reader = new ClassReader();
                 var cls = reader.Read(fs);
 
-                var strings = cls.ConstantPool.Constants.OfType<ConstantStringInfo>().ToList();
-                var floats = cls.ConstantPool.Constants.OfType<ConstantFloatInfo>().ToList();
-                var longs = cls.ConstantPool.Constants.OfType<ConstantLongInfo>().ToList();
-
-                var allStrings = strings.Select(x => x.Value.Value).ToList();
-
-                int count = allStrings.Count;
+                Assert.Equal("net/minecraft/server/aho", cls.ThisClass.Name.Value);
             }
         }
     }
