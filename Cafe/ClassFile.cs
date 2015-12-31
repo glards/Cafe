@@ -17,9 +17,9 @@ namespace Cafe
 
         public ConstantPool ConstantPool { get; }
 
-        public ushort AccessFlag { get; set; }
-        public ushort ThisClass { get; set; }
-        public ushort SuperClass { get; set; }
+        public AccessFlag AccessFlag { get; set; }
+        public ConstantClassInfo ThisClass { get; set; }
+        public ConstantClassInfo SuperClass { get; set; }
 
         public ushort InterfacesCount { get; set; }
         // ??? Interfaces
@@ -57,8 +57,7 @@ namespace Cafe
                 cls.MajorVersion = br.ReadUInt16();
 
                 int constantCount = br.ReadUInt16();
-
-                for (int i = 1; i <= constantCount; i++)
+                for (int i = 1; i < constantCount; i++)
                 {
                     
                     ConstantTag tag = (ConstantTag) br.ReadByte();
