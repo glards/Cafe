@@ -76,5 +76,17 @@ namespace Cafe.Tests
             Assert.Equal(NativeType.Void, voidMethod.ReturnType.NativeType);
 
         }
+
+        [Fact]
+        public void GenericDescriptorTest()
+        {
+            var fieldType = DescriptorParser.ParseFieldType("Ljava/util/List<Lnet/minecraft/server/app;>;");
+            Assert.IsType<ObjectType>(fieldType);
+            ObjectType objectType = fieldType as ObjectType;
+            Assert.NotNull(objectType);
+            Assert.Equal(NativeType.ClassReference, objectType.NativeType);
+            Assert.Equal("java/util/List<Lnet/minecraft/server/app;>", objectType.ClassName);
+
+        }
     }
 }
