@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,8 +15,7 @@ namespace Cafe
         public ushort MinorVersion { get; set; }
         public ushort MajorVersion { get; set; }
 
-        public ushort ConstantPoolSize { get; set; }
-        // ??? ConstantPool
+        public ConstantPool ConstantPool => new ConstantPool();
 
         public ushort AccessFlag { get; set; }
         public ushort ThisClass { get; set; }
@@ -51,8 +51,128 @@ namespace Cafe
                 cls.MinorVersion = br.ReadUInt16();
                 cls.MajorVersion = br.ReadUInt16();
 
+                int constantCount = br.ReadUInt16();
+
+                for (int i = 0; i < constantCount; i++)
+                {
+                    ConstantTag tag = (ConstantTag)br.ReadByte();
+                    var constant = ReadConstant(br, cls, tag);
+                    cls.ConstantPool.Constants.Add(constant);
+                }
+
                 return cls;
             }
+        }
+
+        private ConstantBase ReadConstant(JavaBinaryReader br, ClassFile cls, ConstantTag tag)
+        {
+            switch (tag)
+            {
+                case ConstantTag.Class:
+                    return ReadConstantClass(br, cls);
+                case ConstantTag.FieldRef:
+                    return ReadConstantFieldRef(br, cls);
+                case ConstantTag.MethodRef:
+                    return ReadConstantMethodRef(br, cls);
+                case ConstantTag.InterfaceMethodRef:
+                    return ReadConstantInterfaceMethodRef(br, cls);
+                case ConstantTag.String:
+                    return ReadConstantString(br, cls);
+                case ConstantTag.Integer:
+                    return ReadConstantInteger(br, cls);
+                case ConstantTag.Float:
+                    return ReadConstantFloat(br, cls);
+                case ConstantTag.Long:
+                    return ReadConstantLong(br, cls);
+                case ConstantTag.Double:
+                    return ReadConstantDouble(br, cls);
+                case ConstantTag.NameAndType:
+                    return ReadConstantNameAndType(br, cls);
+                case ConstantTag.Utf8:
+                    return ReadConstantUtf8(br, cls);
+                case ConstantTag.MethodHandle:
+                    return ReadConstantMethodHandle(br, cls);
+                case ConstantTag.MethodType:
+                    return ReadConstantMethodType(br, cls);
+                case ConstantTag.InvokeDynamic:
+                    return ReadConstantInvokeDynamic(br, cls);
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(tag), tag, null);
+            }
+        }
+
+        private ConstantInvokeDynamicInfo ReadConstantInvokeDynamic(JavaBinaryReader br, ClassFile cls)
+        {
+            int attributeIndex = br.ReadUInt16();
+            return new ConstantInvokeDynamicInfo(cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+        }
+
+        private ConstantMethodTypeInfo ReadConstantMethodType(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantMethodTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+        }
+
+        private ConstantMethodHandleInfo ReadConstantMethodHandle(JavaBinaryReader br, ClassFile cls)
+        {
+            ReferenceKind kind = (ReferenceKind)br.ReadByte();
+            return new ConstantMethodHandleInfo(kind, cls.ConstantPool.GetConstant<ConstantBase>(br.ReadUInt16()));
+        }
+
+        private ConstantUtf8Info ReadConstantUtf8(JavaBinaryReader br, ClassFile cls)
+        {
+            int length = br.ReadUInt16();
+            var bytes = br.ReadBytes(length);
+            return new ConstantUtf8Info(Encoding.UTF8.GetString(bytes));
+        }
+
+        private ConstantNameAndTypeInfo ReadConstantNameAndType(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantNameAndTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+        }
+
+        private ConstantDoubleInfo ReadConstantDouble(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantDoubleInfo(BitConverter.ToDouble(br.ReadBytes(8), 0));
+        }
+
+        private ConstantLongInfo ReadConstantLong(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantLongInfo(br.ReadInt64());
+        }
+
+        private ConstantFloatInfo ReadConstantFloat(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantFloatInfo(BitConverter.ToSingle(br.ReadBytes(4), 0));
+        }
+
+        private ConstantIntegerInfo ReadConstantInteger(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantIntegerInfo(br.ReadInt32());
+        }
+
+        private ConstantStringInfo ReadConstantString(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantStringInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+        }
+
+        private ConstantInterfaceMethodRefInfo ReadConstantInterfaceMethodRef(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantInterfaceMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+        }
+
+        private ConstantMethodRefInfo ReadConstantMethodRef(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantMethodRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+        }
+
+        private ConstantFieldRefInfo ReadConstantFieldRef(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantFieldRefInfo(cls.ConstantPool.GetConstant<ConstantClassInfo>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(br.ReadUInt16()));
+        }
+
+        private ConstantClassInfo ReadConstantClass(JavaBinaryReader br, ClassFile cls)
+        {
+            return new ConstantClassInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
         }
     }
 
@@ -62,7 +182,6 @@ namespace Cafe
 
     public static class DescriptorParser
     {
-
         private static FieldType ParseFieldType(string descriptor, int startIndex, out int stopIndex)
         {
             stopIndex = startIndex + 1;
@@ -95,7 +214,7 @@ namespace Cafe
                     throw new ArgumentOutOfRangeException();
             }
         }
-        
+
         public static FieldType ParseFieldType(string descriptor)
         {
             int startIndex = 0;
@@ -107,7 +226,7 @@ namespace Cafe
         {
             FieldType ret = new FieldType(NativeType.Void);
             List<FieldType> parameters = new List<FieldType>();
-            
+
             if (descriptor[0] != '(')
             {
                 throw new ArgumentException("Descriptor does not start with '('");
@@ -192,7 +311,7 @@ namespace Cafe
         public FieldType ReturnType { get; set; }
 
         public FieldType[] ParameterTypes { get; set; }
-        
+
         public MethodDescriptor(FieldType[] parameterTypes, FieldType returnType)
         {
             ParameterTypes = parameterTypes;
@@ -216,6 +335,21 @@ namespace Cafe
         MethodHandle = 15,
         MethodType = 16,
         InvokeDynamic = 18
+    }
+
+    public class ConstantPool
+    {
+        public List<ConstantBase> Constants => new List<ConstantBase>();
+
+        public T GetConstant<T>(int index) where T : ConstantBase
+        {
+            return Constants[index] as T;
+        }
+
+        public int GetIndex(ConstantBase constant)
+        {
+            return Constants.IndexOf(constant);
+        }
     }
 
     public abstract class ConstantBase
@@ -306,7 +440,7 @@ namespace Cafe
             Value = value;
         }
     }
-    
+
     public class ConstantLongInfo : ConstantBase
     {
         public long Value { get; set; }
@@ -388,7 +522,7 @@ namespace Cafe
         //TODO: bootstrap_method_attr_index
 
         public ConstantNameAndTypeInfo NameAndType { get; set; }
-        
+
         public ConstantInvokeDynamicInfo(ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.InvokeDynamic)
         {
             NameAndType = nameAndType;
