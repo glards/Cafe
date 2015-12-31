@@ -50,7 +50,7 @@ namespace Cafe
                 cls.Magic = br.ReadUInt32();
                 if (cls.Magic != 0xCAFEBABE)
                 {
-                    throw new InvalidOperationException("Magic value does not ");
+                    throw new InvalidOperationException("Magic value is not valid");
                 }
 
                 cls.MinorVersion = br.ReadUInt16();
