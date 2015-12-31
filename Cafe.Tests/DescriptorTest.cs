@@ -14,28 +14,28 @@ namespace Cafe.Tests
         {
             var fieldType = DescriptorParser.ParseFieldType("I");
             Assert.IsType<FieldType>(fieldType);
-            Assert.Equal(NativeTypes.Int, fieldType.NativeType);
+            Assert.Equal(NativeType.Int, fieldType.NativeType);
 
             fieldType = DescriptorParser.ParseFieldType("Ljava/lang/Object;");
             Assert.IsType<ObjectType>(fieldType);
             ObjectType objectType = fieldType as ObjectType;
             Assert.NotNull(objectType);
-            Assert.Equal(NativeTypes.ClassReference, objectType.NativeType);
+            Assert.Equal(NativeType.ClassReference, objectType.NativeType);
             Assert.Equal("java/lang/Object", objectType.ClassName);
 
             fieldType = DescriptorParser.ParseFieldType("[[[D");
             Assert.IsType<ArrayType>(fieldType);
             ArrayType arrayType = fieldType as ArrayType;
             Assert.NotNull(arrayType);
-            Assert.Equal(NativeTypes.Array, arrayType.NativeType);
+            Assert.Equal(NativeType.Array, arrayType.NativeType);
             arrayType = arrayType.InnerType as ArrayType;
             Assert.NotNull(arrayType);
-            Assert.Equal(NativeTypes.Array, arrayType.NativeType);
+            Assert.Equal(NativeType.Array, arrayType.NativeType);
             arrayType = arrayType.InnerType as ArrayType;
             Assert.NotNull(arrayType);
-            Assert.Equal(NativeTypes.Array, arrayType.NativeType);
+            Assert.Equal(NativeType.Array, arrayType.NativeType);
             fieldType = arrayType.InnerType;
-            Assert.Equal(NativeTypes.Double, fieldType.NativeType);
+            Assert.Equal(NativeType.Double, fieldType.NativeType);
         }
 
 
@@ -48,17 +48,17 @@ namespace Cafe.Tests
             Assert.NotNull(methodDescriptor.ParameterTypes);
             Assert.Equal(5, methodDescriptor.ParameterTypes.Length);
             
-            Assert.Equal(NativeTypes.Int, methodDescriptor.ParameterTypes[0].NativeType);
-            Assert.Equal(NativeTypes.Double, methodDescriptor.ParameterTypes[1].NativeType);
-            Assert.Equal(NativeTypes.Array, methodDescriptor.ParameterTypes[2].NativeType);
-            Assert.Equal(NativeTypes.ClassReference, methodDescriptor.ParameterTypes[3].NativeType);
-            Assert.Equal(NativeTypes.Array, methodDescriptor.ParameterTypes[4].NativeType);
+            Assert.Equal(NativeType.Int, methodDescriptor.ParameterTypes[0].NativeType);
+            Assert.Equal(NativeType.Double, methodDescriptor.ParameterTypes[1].NativeType);
+            Assert.Equal(NativeType.Array, methodDescriptor.ParameterTypes[2].NativeType);
+            Assert.Equal(NativeType.ClassReference, methodDescriptor.ParameterTypes[3].NativeType);
+            Assert.Equal(NativeType.Array, methodDescriptor.ParameterTypes[4].NativeType);
 
             var obj = methodDescriptor.ParameterTypes[3] as ObjectType;
             Assert.NotNull(obj);
             Assert.Equal("java/lang/Thread", obj.ClassName);
 
-            Assert.Equal(NativeTypes.ClassReference, methodDescriptor.ReturnType.NativeType);
+            Assert.Equal(NativeType.ClassReference, methodDescriptor.ReturnType.NativeType);
 
             var ret = methodDescriptor.ReturnType as ObjectType;
             Assert.NotNull(ret);
@@ -73,7 +73,7 @@ namespace Cafe.Tests
             Assert.NotNull(voidMethod.ParameterTypes);
             Assert.Equal(0, voidMethod.ParameterTypes.Length);
 
-            Assert.Equal(NativeTypes.Void, voidMethod.ReturnType.NativeType);
+            Assert.Equal(NativeType.Void, voidMethod.ReturnType.NativeType);
 
         }
     }

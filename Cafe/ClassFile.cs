@@ -32,14 +32,13 @@ namespace Cafe
         
         public ushort AttributesCount { get; set; }
         // Attributes
-        
-        public ClassFile()
-        {
-        }
+    }
 
-        public static ClassFile Read(string filename)
+    public class ClassReader
+    {
+        public ClassFile Read(Stream clasStream)
         {
-            using (JavaBinaryReader br = new JavaBinaryReader(new FileStream(filename, FileMode.Open)))
+            using (JavaBinaryReader br = new JavaBinaryReader(clasStream))
             {
                 ClassFile cls = new ClassFile();
 
@@ -57,6 +56,10 @@ namespace Cafe
         }
     }
 
+    public class ClassWriter
+    {
+    }
+
     public static class DescriptorParser
     {
 
@@ -66,26 +69,26 @@ namespace Cafe
             switch (descriptor[startIndex])
             {
                 case 'B':
-                    return new FieldType(NativeTypes.Byte);
+                    return new FieldType(NativeType.Byte);
                 case 'C':
-                    return new FieldType(NativeTypes.Char);
+                    return new FieldType(NativeType.Char);
                 case 'D':
-                    return new FieldType(NativeTypes.Double);
+                    return new FieldType(NativeType.Double);
                 case 'F':
-                    return new FieldType(NativeTypes.Float);
+                    return new FieldType(NativeType.Float);
                 case 'I':
-                    return new FieldType(NativeTypes.Int);
+                    return new FieldType(NativeType.Int);
                 case 'J':
-                    return new FieldType(NativeTypes.Long);
+                    return new FieldType(NativeType.Long);
                 case 'L':
                     int separatorPos = descriptor.IndexOf(";", startIndex);
                     string className = descriptor.Substring(startIndex + 1, separatorPos - startIndex - 1);
                     stopIndex = separatorPos + 1;
                     return new ObjectType(className);
                 case 'S':
-                    return new FieldType(NativeTypes.Short);
+                    return new FieldType(NativeType.Short);
                 case 'Z':
-                    return new FieldType(NativeTypes.Boolean);
+                    return new FieldType(NativeType.Boolean);
                 case '[':
                     return new ArrayType(ParseFieldType(descriptor, startIndex + 1, out stopIndex));
                 default:
@@ -102,7 +105,7 @@ namespace Cafe
 
         public static MethodDescriptor ParseMethodDescriptor(string descriptor)
         {
-            FieldType ret = new FieldType(NativeTypes.Void);
+            FieldType ret = new FieldType(NativeType.Void);
             List<FieldType> parameters = new List<FieldType>();
             
             if (descriptor[0] != '(')
@@ -139,7 +142,7 @@ namespace Cafe
         }
     }
 
-    public enum NativeTypes
+    public enum NativeType
     {
         Byte,
         Char,
@@ -156,9 +159,9 @@ namespace Cafe
 
     public class FieldType
     {
-        public NativeTypes NativeType { get; set; }
+        public NativeType NativeType { get; set; }
 
-        public FieldType(NativeTypes type)
+        public FieldType(NativeType type)
         {
             NativeType = type;
         }
@@ -168,7 +171,7 @@ namespace Cafe
     {
         public string ClassName { get; set; }
 
-        public ObjectType(string className) : base(NativeTypes.ClassReference)
+        public ObjectType(string className) : base(NativeType.ClassReference)
         {
             ClassName = className;
         }
@@ -178,7 +181,7 @@ namespace Cafe
     {
         public FieldType InnerType { get; set; }
 
-        public ArrayType(FieldType innerType) : base(NativeTypes.Array)
+        public ArrayType(FieldType innerType) : base(NativeType.Array)
         {
             InnerType = innerType;
         }
@@ -194,6 +197,201 @@ namespace Cafe
         {
             ParameterTypes = parameterTypes;
             ReturnType = returnType;
+        }
+    }
+
+    public enum ConstantTag
+    {
+        Class = 7,
+        FieldRef = 9,
+        MethodRef = 10,
+        InterfaceMethodRef = 11,
+        String = 8,
+        Integer = 3,
+        Float = 4,
+        Long = 5,
+        Double = 6,
+        NameAndType = 12,
+        Utf8 = 1,
+        MethodHandle = 15,
+        MethodType = 16,
+        InvokeDynamic = 18
+    }
+
+    public abstract class ConstantBase
+    {
+        public ConstantTag Tag { get; set; }
+
+        public ConstantBase(ConstantTag tag)
+        {
+            Tag = tag;
+        }
+    }
+
+    public class ConstantClassInfo : ConstantBase
+    {
+        public ConstantUtf8Info Name { get; set; }
+
+        public ConstantClassInfo(ConstantUtf8Info name) : base(ConstantTag.Class)
+        {
+            Name = name;
+        }
+    }
+
+    public class ConstantFieldRefInfo : ConstantBase
+    {
+        public ConstantClassInfo Class { get; set; }
+        public ConstantNameAndTypeInfo NameAndType { get; set; }
+
+        public ConstantFieldRefInfo(ConstantClassInfo cls, ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.FieldRef)
+        {
+            Class = cls;
+            NameAndType = nameAndType;
+        }
+    }
+
+    public class ConstantMethodRefInfo : ConstantBase
+    {
+        public ConstantClassInfo Class { get; set; }
+        public ConstantNameAndTypeInfo NameAndType { get; set; }
+
+        public ConstantMethodRefInfo(ConstantClassInfo cls, ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.MethodRef)
+        {
+            Class = cls;
+            NameAndType = nameAndType;
+        }
+    }
+
+    public class ConstantInterfaceMethodRefInfo : ConstantBase
+    {
+        public ConstantClassInfo Class { get; set; }
+        public ConstantNameAndTypeInfo NameAndType { get; set; }
+
+        public ConstantInterfaceMethodRefInfo(ConstantClassInfo cls, ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.InterfaceMethodRef)
+        {
+            Class = cls;
+            NameAndType = nameAndType;
+        }
+    }
+
+
+    public class ConstantStringInfo : ConstantBase
+    {
+        public ConstantUtf8Info Value { get; set; }
+
+        public ConstantStringInfo(ConstantUtf8Info value) : base(ConstantTag.String)
+        {
+            Value = value;
+        }
+    }
+
+
+    public class ConstantIntegerInfo : ConstantBase
+    {
+        public int Value { get; set; }
+
+        public ConstantIntegerInfo(int value) : base(ConstantTag.Integer)
+        {
+            Value = value;
+        }
+    }
+
+
+    public class ConstantFloatInfo : ConstantBase
+    {
+        public float Value { get; set; }
+
+        public ConstantFloatInfo(float value) : base(ConstantTag.Float)
+        {
+            Value = value;
+        }
+    }
+    
+    public class ConstantLongInfo : ConstantBase
+    {
+        public long Value { get; set; }
+
+        public ConstantLongInfo(long value) : base(ConstantTag.Long)
+        {
+            Value = value;
+        }
+    }
+
+    public class ConstantDoubleInfo : ConstantBase
+    {
+        public double Value { get; set; }
+
+        public ConstantDoubleInfo(double value) : base(ConstantTag.Double)
+        {
+            Value = value;
+        }
+    }
+
+    public class ConstantNameAndTypeInfo : ConstantBase
+    {
+        public ConstantUtf8Info Name { get; set; }
+        public ConstantUtf8Info Descriptor { get; set; }
+
+        public ConstantNameAndTypeInfo(ConstantUtf8Info name, ConstantUtf8Info descriptor) : base(ConstantTag.NameAndType)
+        {
+        }
+    }
+
+    public class ConstantUtf8Info : ConstantBase
+    {
+        public string Value { get; set; }
+
+        public ConstantUtf8Info(string value) : base(ConstantTag.Utf8)
+        {
+            Value = value;
+        }
+    }
+
+    public enum ReferenceKind
+    {
+        GetField = 1,
+        GetStatic = 2,
+        PutField = 3,
+        PutStatic = 4,
+        InvokeVirtual = 5,
+        NewInvokeSpecial = 8,
+        InvokeStatic = 6,
+        InvokeSpecial = 7,
+        InvokeInterface = 9,
+    }
+
+    public class ConstantMethodHandleInfo : ConstantBase
+    {
+        public ReferenceKind ReferenceKind { get; set; }
+
+        public ConstantBase Reference { get; set; }
+
+        public ConstantMethodHandleInfo(ReferenceKind kind, ConstantBase reference) : base(ConstantTag.MethodHandle)
+        {
+            ReferenceKind = kind;
+            Reference = reference;
+        }
+    }
+
+    public class ConstantMethodTypeInfo : ConstantBase
+    {
+        public ConstantUtf8Info Descriptor { get; set; }
+
+        public ConstantMethodTypeInfo(ConstantUtf8Info descriptor) : base(ConstantTag.MethodType)
+        {
+            Descriptor = descriptor;
+        }
+    }
+
+    public class ConstantInvokeDynamicInfo : ConstantBase
+    {
+        //TODO: bootstrap_method_attr_index
+
+        public ConstantNameAndTypeInfo NameAndType { get; set; }
+        
+        public ConstantInvokeDynamicInfo(ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.InvokeDynamic)
+        {
+            NameAndType = nameAndType;
         }
     }
 }
