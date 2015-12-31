@@ -58,20 +58,19 @@ namespace Cafe
 
                 int constantCount = br.ReadUInt16();
 
-                for (int i = 0; i < constantCount; i++)
+                for (int i = 1; i <= constantCount; i++)
                 {
-                    ConstantBase constant;
-                    try
-                    {
-                        ConstantTag tag = (ConstantTag) br.ReadByte();
-                        constant = ReadConstant(br, cls, tag);
-                    }
-                    catch (ArgumentOutOfRangeException)
-                    {
-                        // javap ignore invalid constants
-                        constant = new ConstantInvalidInfo();
-                    }
+                    
+                    ConstantTag tag = (ConstantTag) br.ReadByte();
+                    ConstantBase constant = ReadConstant(br, cls, tag);
                     cls.ConstantPool.Constants.Add(constant);
+
+                    if (constant.Tag == ConstantTag.Double || constant.Tag == ConstantTag.Long)
+                    {
+                        // If the constant is a double or a long, it takes two slots
+                        cls.ConstantPool.Constants.Add(new ConstantInvalidInfo());
+                        i++;
+                    }
                 }
 
                 return cls;
@@ -151,13 +150,18 @@ namespace Cafe
 
         private ConstantDoubleInfo ReadConstantDouble(JavaBinaryReader br, ClassFile cls)
         {
-            double val = BitConverter.ToDouble(br.ReadBytes(8), 0);
+            var high = br.ReadUInt32();
+            var low = br.ReadUInt32();
+            long l = ((long)high << 32) + low;
+            double val = BitConverter.Int64BitsToDouble(l);
             return new ConstantDoubleInfo(val);
         }
 
         private ConstantLongInfo ReadConstantLong(JavaBinaryReader br, ClassFile cls)
         {
-            long val = br.ReadInt64();
+            var high = br.ReadUInt32();
+            var low = br.ReadUInt32();
+            long val = ((long) high << 32) + low;
             return new ConstantLongInfo(val);
         }
 
