@@ -15,7 +15,7 @@ namespace Cafe
         public ushort MinorVersion { get; set; }
         public ushort MajorVersion { get; set; }
 
-        public ConstantPool ConstantPool => new ConstantPool();
+        public ConstantPool ConstantPool { get; }
 
         public ushort AccessFlag { get; set; }
         public ushort ThisClass { get; set; }
@@ -32,6 +32,11 @@ namespace Cafe
         
         public ushort AttributesCount { get; set; }
         // Attributes
+
+        public ClassFile()
+        {
+            ConstantPool = new ConstantPool();
+        }
     }
 
     public class ClassReader
@@ -127,7 +132,9 @@ namespace Cafe
 
         private ConstantNameAndTypeInfo ReadConstantNameAndType(JavaBinaryReader br, ClassFile cls)
         {
-            return new ConstantNameAndTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()), cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16()));
+            int nameIndex = br.ReadUInt16();
+            int descriptorIndex = br.ReadUInt16();
+            return new ConstantNameAndTypeInfo(cls.ConstantPool.GetConstant<ConstantUtf8Info>(nameIndex), cls.ConstantPool.GetConstant<ConstantUtf8Info>(descriptorIndex));
         }
 
         private ConstantDoubleInfo ReadConstantDouble(JavaBinaryReader br, ClassFile cls)
@@ -339,11 +346,16 @@ namespace Cafe
 
     public class ConstantPool
     {
-        public List<ConstantBase> Constants => new List<ConstantBase>();
+        public List<ConstantBase> Constants { get; }
+
+        public ConstantPool()
+        {
+            Constants = new List<ConstantBase>();
+        }
 
         public T GetConstant<T>(int index) where T : ConstantBase
         {
-            return Constants[index] as T;
+            return Constants[index - 1] as T;
         }
 
         public int GetIndex(ConstantBase constant)
@@ -468,6 +480,8 @@ namespace Cafe
 
         public ConstantNameAndTypeInfo(ConstantUtf8Info name, ConstantUtf8Info descriptor) : base(ConstantTag.NameAndType)
         {
+            Name = name;
+            Descriptor = descriptor;
         }
     }
 
