@@ -207,7 +207,25 @@ namespace Cafe
                 case 'J':
                     return new FieldType(NativeType.Long);
                 case 'L':
+                    int genericPos = descriptor.IndexOf("<", startIndex);
                     int separatorPos = descriptor.IndexOf(";", startIndex);
+
+                    if (genericPos != -1 && separatorPos > genericPos)
+                    {
+                        int endGeneric;
+                        FieldType generic = ParseFieldType(descriptor, genericPos + 1, out endGeneric);
+                        if (descriptor[endGeneric] != '>')
+                        {
+                            throw new InvalidOperationException("Generic does not end with >");
+                        }
+
+                        separatorPos = endGeneric + 1;
+                        if (descriptor[separatorPos] != ';')
+                        {
+                            throw new InvalidOperationException("Generic does not end with ;");
+                        }
+                    }
+
                     string className = descriptor.Substring(startIndex + 1, separatorPos - startIndex - 1);
                     stopIndex = separatorPos + 1;
                     return new ObjectType(className);
