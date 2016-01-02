@@ -21,21 +21,21 @@ namespace Cafe
         public ConstantClassInfo ThisClass { get; set; }
         public ConstantClassInfo SuperClass { get; set; }
 
-        public ushort InterfacesCount { get; set; }
-        // ??? Interfaces
+        public List<ConstantClassInfo> Interfaces { get; set; }
 
-        public ushort FieldsCount { get; set; }
-        // Fields
+        public List<FieldInfo> Fields { get; set; }
 
-        public ushort MethodsCount { get; set; }
-        // Methods
-        
-        public ushort AttributesCount { get; set; }
-        // Attributes
+        public List<MethodInfo> Methods { get; set; }
+
+        public List<AttributeInfo> Attributes { get; set; }
 
         public ClassFile()
         {
             ConstantPool = new ConstantPool();
+            Interfaces = new List<ConstantClassInfo>();
+            Fields = new List<FieldInfo>();
+            Methods = new List<MethodInfo>();
+            Attributes = new List<AttributeInfo>();
         }
     }
 
@@ -56,21 +56,7 @@ namespace Cafe
                 cls.MinorVersion = br.ReadUInt16();
                 cls.MajorVersion = br.ReadUInt16();
 
-                int constantCount = br.ReadUInt16();
-                for (int i = 1; i < constantCount; i++)
-                {
-                    
-                    ConstantTag tag = (ConstantTag) br.ReadByte();
-                    ConstantBase constant = ReadConstant(br, cls, tag);
-                    cls.ConstantPool.Constants.Add(constant);
-
-                    if (constant.Tag == ConstantTag.Double || constant.Tag == ConstantTag.Long)
-                    {
-                        // If the constant is a double or a long, it takes two slots
-                        cls.ConstantPool.Constants.Add(new ConstantInvalidInfo());
-                        i++;
-                    }
-                }
+                ReadConstantPool(br, cls);
 
                 cls.AccessFlag = (AccessFlag)br.ReadUInt16();
 
@@ -83,7 +69,106 @@ namespace Cafe
                     cls.SuperClass = cls.ConstantPool.GetConstant<ConstantClassInfo>(superClassIndex);
                 }
 
+                ReadInterfaces(br, cls);
+
+                ReadFields(br, cls);
+
+                ReadMethods(br, cls);
+
+                int attributeCount = br.ReadUInt16();
+                for (int i = 0; i < attributeCount; i++)
+                {
+                    var attr = ReadAttribute(br, cls);
+                    cls.Attributes.Add(attr);
+                }
+
                 return cls;
+            }
+        }
+
+        private static void ReadInterfaces(JavaBinaryReader br, ClassFile cls)
+        {
+            int interfaceCount = br.ReadUInt16();
+            for (int i = 0; i < interfaceCount; i++)
+            {
+                int index = br.ReadUInt16();
+                cls.Interfaces.Add(cls.ConstantPool.GetConstant<ConstantClassInfo>(index));
+            }
+        }
+
+        private void ReadFields(JavaBinaryReader br, ClassFile cls)
+        {
+            int fieldCount = br.ReadUInt16();
+            for (int i = 0; i < fieldCount; i++)
+            {
+                var field = ReadField(br, cls);
+                cls.Fields.Add(field);
+            }
+        }
+
+        private FieldInfo ReadField(JavaBinaryReader br, ClassFile cls)
+        {
+            AccessFlag af = (AccessFlag) br.ReadUInt16();
+            ConstantUtf8Info name = cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16());
+            ConstantUtf8Info descriptor = cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16());
+            int attributeCount = br.ReadUInt16();
+            var fi = new FieldInfo(af, name, descriptor);
+            for (int i = 0; i < attributeCount; i++)
+            {
+                var attr = ReadAttribute(br, cls);
+                fi.Attributes.Add(attr);
+            }
+            return fi;
+        }
+
+        private void ReadMethods(JavaBinaryReader br, ClassFile cls)
+        {
+            int fieldCount = br.ReadUInt16();
+            for (int i = 0; i < fieldCount; i++)
+            {
+                var method = ReadMethod(br, cls);
+                cls.Methods.Add(method);
+            }
+        }
+
+        private MethodInfo ReadMethod(JavaBinaryReader br, ClassFile cls)
+        {
+            AccessFlag af = (AccessFlag)br.ReadUInt16();
+            ConstantUtf8Info name = cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16());
+            ConstantUtf8Info descriptor = cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16());
+            int attributeCount = br.ReadUInt16();
+            var fi = new MethodInfo(af, name, descriptor);
+            for (int i = 0; i < attributeCount; i++)
+            {
+                var attr = ReadAttribute(br, cls);
+                fi.Attributes.Add(attr);
+            }
+            return fi;
+        }
+
+        private AttributeInfo ReadAttribute(JavaBinaryReader br, ClassFile cls)
+        {
+            ConstantUtf8Info name = cls.ConstantPool.GetConstant<ConstantUtf8Info>(br.ReadUInt16());
+            int length = br.ReadInt32();
+            var bytes = br.ReadBytes(length);
+            return new AttributeInfo(name, bytes);
+        }
+
+        private void ReadConstantPool(JavaBinaryReader br, ClassFile cls)
+        {
+            int constantCount = br.ReadUInt16();
+            for (int i = 1; i < constantCount; i++)
+            {
+                ConstantTag tag = (ConstantTag) br.ReadByte();
+                ConstantBase constant = ReadConstant(br, cls, tag);
+                cls.ConstantPool.Constants.Add(constant);
+
+                if (constant.Tag == ConstantTag.Double || constant.Tag == ConstantTag.Long)
+                {
+                    // If the constant is a double or a long, it takes two slots
+                    cls.ConstantPool.Constants.Add(new ConstantInvalidInfo());
+                    i++;
+                }
             }
         }
 
@@ -128,7 +213,7 @@ namespace Cafe
         {
             int attributeIndex = br.ReadUInt16();
             int index = br.ReadUInt16();
-            return new ConstantInvokeDynamicInfo(cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(index));
+            return new ConstantInvokeDynamicInfo(cls.ConstantPool.GetConstant<ConstantNameAndTypeInfo>(index), attributeIndex);
         }
 
         private ConstantMethodTypeInfo ReadConstantMethodType(JavaBinaryReader br, ClassFile cls)
@@ -598,12 +683,12 @@ namespace Cafe
 
     public class ConstantInvokeDynamicInfo : ConstantBase
     {
-        //TODO: bootstrap_method_attr_index
-
+        public int AttributeIndex { get; set; }
         public ConstantNameAndTypeInfo NameAndType { get; set; }
 
-        public ConstantInvokeDynamicInfo(ConstantNameAndTypeInfo nameAndType) : base(ConstantTag.InvokeDynamic)
+        public ConstantInvokeDynamicInfo(ConstantNameAndTypeInfo nameAndType, int attributeIndex) : base(ConstantTag.InvokeDynamic)
         {
+            AttributeIndex = attributeIndex;
             NameAndType = nameAndType;
         }
     }
@@ -619,5 +704,49 @@ namespace Cafe
         Synthetic = 0x1000,
         Annotation = 0x2000,
         Enum = 0x4000
+    }
+
+    public class AttributeInfo
+    {
+        public ConstantUtf8Info Name { get; set; }
+        public byte[] Info { get; set; }
+
+        public AttributeInfo(ConstantUtf8Info name, byte[] info)
+        {
+            Name = name;
+            Info = info;
+        }
+    }
+
+    public class FieldInfo
+    {
+        public AccessFlag AccessFlag { get; set; }
+        public ConstantUtf8Info Name { get; set; }
+        public ConstantUtf8Info Descriptor { get; set; }
+        public List<AttributeInfo> Attributes { get; set; }
+
+        public FieldInfo(AccessFlag accessFlag, ConstantUtf8Info name, ConstantUtf8Info descriptor)
+        {
+            AccessFlag = accessFlag;
+            Name = name;
+            Descriptor = descriptor;
+            Attributes = new List<AttributeInfo>();
+        }
+    }
+
+    public class MethodInfo
+    {
+        public AccessFlag AccessFlag { get; set; }
+        public ConstantUtf8Info Name { get; set; }
+        public ConstantUtf8Info Descriptor { get; set; }
+        public List<AttributeInfo> Attributes { get; set; }
+
+        public MethodInfo(AccessFlag accessFlag, ConstantUtf8Info name, ConstantUtf8Info descriptor)
+        {
+            AccessFlag = accessFlag;
+            Name = name;
+            Descriptor = descriptor;
+            Attributes = new List<AttributeInfo>();
+        }
     }
 }
